@@ -1,0 +1,46 @@
+@TaskFlow_HostAddress = http://localhost:5070
+@token = paste-login-token-here
+
+### Kullanıcı kaydı
+POST {{TaskFlow_HostAddress}}/Auth/register
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "ChangeMe123!"
+}
+
+### Giriş — yanıttaki token değerini yukarıdaki @token alanına yapıştırın
+POST {{TaskFlow_HostAddress}}/Auth/login
+Content-Type: application/json
+
+{
+  "email": "demo@example.com",
+  "password": "ChangeMe123!"
+}
+
+### Görevleri listele
+GET {{TaskFlow_HostAddress}}/Task?page=1&pageSize=10&sort=due_date
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### Görev oluştur
+POST {{TaskFlow_HostAddress}}/Task
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "TaskFlow demosunu hazırla",
+  "description": "GitHub ve LinkedIn paylaşımı için projeyi hazırla",
+  "priority": "Yüksek",
+  "status": "Devam Ediyor",
+  "dueDate": "2026-09-01"
+}
+
+### Ayarları getir
+GET {{TaskFlow_HostAddress}}/settings
+Authorization: Bearer {{token}}
+
+### Hatırlatıcıları getir
+GET {{TaskFlow_HostAddress}}/reminders
+Authorization: Bearer {{token}}

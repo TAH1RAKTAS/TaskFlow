@@ -1,0 +1,29 @@
+# IDE and operating system
+.DS_Store
+.idea/
+.vscode/
+*.sln.DotSettings.user
+*.user
+
+# .NET
+**/bin/
+**/obj/
+**/logs/
+TestResults/
+coverage/
+
+# Frontend
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+**/http-client.private.env.json
+
+# Logs
+*.log
+npm-debug.log*

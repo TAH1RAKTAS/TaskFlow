@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskFlow", "TaskFlow\TaskFlow.csproj", "{8B515482-DA44-413D-AA03-733AA245097A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskFlow.Tests", "TaskFlow.Tests\TaskFlow.Tests.csproj", "{F8B8FD9D-D3BF-454B-AC0A-3D08329F5506}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{CEFC91FA-3450-4A13-9336-A4223A7BEDA1}"
+	ProjectSection(SolutionItems) = preProject
+		compose.yaml = compose.yaml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8B515482-DA44-413D-AA03-733AA245097A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B515482-DA44-413D-AA03-733AA245097A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B515482-DA44-413D-AA03-733AA245097A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B515482-DA44-413D-AA03-733AA245097A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F8B8FD9D-D3BF-454B-AC0A-3D08329F5506}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F8B8FD9D-D3BF-454B-AC0A-3D08329F5506}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F8B8FD9D-D3BF-454B-AC0A-3D08329F5506}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F8B8FD9D-D3BF-454B-AC0A-3D08329F5506}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
