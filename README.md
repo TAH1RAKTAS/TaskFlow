@@ -62,6 +62,13 @@ npm run dev
 
 Web uygulaması varsayılan olarak `http://localhost:5173`, API ise `http://localhost:5070` adresinde açılır. Docker başlangıcında migration'lar otomatik uygulanır.
 
+### Docker sorun giderme
+
+- `sqlserver is unhealthy` ve `Login failed for user 'sa'` hataları birlikte görünüyorsa `.env` içindeki `MSSQL_SA_PASSWORD` daha önce oluşturulan Docker volume'undaki paroladan farklıdır. Verileri korumak için `.env` dosyasına ilk kurulumda kullandığınız parolayı geri yazın ve `docker compose up -d` çalıştırın.
+- Yerel veriler önemli değilse temiz kurulum için `docker compose down -v` ve ardından `docker compose up --build` çalıştırın. `down -v` yerel TaskFlow veritabanını siler.
+- Apple Silicon Mac'lerde SQL Server amd64 emülasyonu ile çalışır. Compose dosyası gerekli platformu açıkça seçer ve beklenmeyen bir container kapanmasında servisleri otomatik yeniden başlatır.
+- Container durumlarını `docker compose ps`, son hata kayıtlarını `docker compose logs --tail=50` ile kontrol edebilirsiniz.
+
 ## Yerel geliştirme
 
 Gereksinimler: .NET 10 SDK, Node.js ve çalışan bir SQL Server.

@@ -23,6 +23,30 @@ function remainingClass(date: string | null) {
   if (days <= 7) return 'soon'
   return 'safe'
 }
+
+async function apiErrorMessage(response: Response, fallback: string) {
+  const text = await response.text()
+  if (!text) return fallback
+
+  try {
+    const payload = JSON.parse(text) as {
+      message?: unknown
+      errors?: Record<string, unknown>
+    }
+    const validationMessages = Object.values(payload.errors ?? {})
+      .flatMap((value) => Array.isArray(value) ? value : [value])
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+
+    if (validationMessages.length > 0) return validationMessages.join(' ')
+    if (typeof payload.message === 'string' && payload.message.trim()) return payload.message
+    return fallback
+  } catch {
+    return text.trim() || fallback
+  }
+}
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+
 function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -63,27 +87,30 @@ function App() {
   }, [logout, page, pageSize, search, sort, view])
   const login = async () => {
     setMessage('')
+    if (!isValidEmail(email)) return setMessage('Geçerli bir e-posta adresi girin.')
+    if (!password) return setMessage('Şifre zorunludur.')
     try {
       const response = await fetch(`${api}/Auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
+      if (!response.ok) return setMessage(await apiErrorMessage(response, 'Giriş yapılamadı.'))
       const data = await response.text()
-      if (!response.ok) return setMessage(data)
       const normalizedEmail = email.trim().toLowerCase()
       localStorage.setItem('token', data); localStorage.setItem('accountEmail', normalizedEmail); setAccountEmail(normalizedEmail); setIsLoggedIn(true); setPassword('')
     } catch { setMessage('Sunucuya bağlanılamadı.') }
   }
   const register = async () => {
     setMessage('')
+    if (!isValidEmail(email)) return setMessage('Geçerli bir e-posta adresi girin.')
+    if (password.length < 8) return setMessage('Şifre en az 8 karakter olmalıdır.')
     try {
       const response = await fetch(`${api}/Auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
-      const data = await response.text()
-      if (!response.ok) return setMessage(data)
+      if (!response.ok) return setMessage(await apiErrorMessage(response, 'Kayıt oluşturulamadı.'))
       setIsRegistering(false); setPassword(''); setMessage('Kayıt başarılı. Giriş yapabilirsin.')
     } catch { setMessage('Sunucuya bağlanılamadı.') }
   }
   const saveTask = async (id?: number) => {
     if (!title.trim() || !description.trim()) return setTaskMessage('Başlık ve açıklama boş bırakılamaz.')
     const response = await fetch(`${api}/Task${id ? `/${id}` : ''}`, { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ title: title.trim(), description: description.trim(), priority, status, dueDate: dueDate || null }) })
-    if (!response.ok) return setTaskMessage(id ? 'Görev güncellenemedi.' : 'Görev oluşturulamadı.')
+    if (!response.ok) return setTaskMessage(await apiErrorMessage(response, id ? 'Görev güncellenemedi.' : 'Görev oluşturulamadı.'))
     resetForm(); setPage(1); await getTasks()
   }
   const removeTask = async (id: number) => {
@@ -95,8 +122,7 @@ function App() {
   const updateStatus = async (task: Task, next: Status) => {
     const response = await fetch(`${api}/Task/${task.id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ status: next }) })
     if (!response.ok) {
-      const error = await response.json().catch(() => null)
-      return setTaskMessage(error?.message ?? 'Görev durumu güncellenemedi.')
+      return setTaskMessage(await apiErrorMessage(response, 'Görev durumu güncellenemedi.'))
     }
     await getTasks()
   }
@@ -114,14 +140,19 @@ function App() {
     setReminders(data.data ?? [])
   }, [logout])
   const createReminder = async () => {
-    if (!reminderTaskId || !reminderEmail.trim()) return setTaskMessage('Görev ve geçerli bir e-posta adresi seçin.')
-    const response = await fetch(`${api}/reminders`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ taskItemId: Number(reminderTaskId), recipientEmail: reminderEmail, daysBefore: Number(reminderDays) }) })
-    if (response.status === 401) return logout()
-    if (!response.ok) {
-      const error = await response.json().catch(() => null)
-      return setTaskMessage(error?.message ?? 'Hatırlatıcı kaydedilemedi.')
+    if (!reminderTaskId) return setTaskMessage('Hatırlatıcı için bir görev seçin.')
+    if (!isValidEmail(reminderEmail)) return setTaskMessage('Geçerli bir e-posta adresi girin.')
+    const days = Number(reminderDays)
+    if (!Number.isInteger(days) || days < 0 || days > 365) return setTaskMessage('Gün sayısı 0 ile 365 arasında olmalıdır.')
+
+    try {
+      const response = await fetch(`${api}/reminders`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` }, body: JSON.stringify({ taskItemId: Number(reminderTaskId), recipientEmail: reminderEmail.trim(), daysBefore: days }) })
+      if (response.status === 401) return logout()
+      if (!response.ok) return setTaskMessage(await apiErrorMessage(response, 'Hatırlatıcı kaydedilemedi.'))
+      setTaskMessage('Hatırlatıcı planlandı. E-posta, belirlenen tarihte gönderilecek.'); setReminderTaskId(''); await loadReminders()
+    } catch {
+      setTaskMessage('Sunucuya bağlanılamadı. Hatırlatıcı kaydedilemedi.')
     }
-    setTaskMessage('Hatırlatıcı kaydedildi.'); setReminderTaskId(''); await loadReminders()
   }
   useEffect(() => {
     if (!isLoggedIn) return
@@ -145,7 +176,7 @@ function App() {
     const request = window.setTimeout(() => void loadReminders(), 0)
     return () => window.clearTimeout(request)
   }, [isLoggedIn, loadReminders])
-  if (!isLoggedIn) return <div className="login-container"><div className="login-card"><h1>TaskFlow</h1><p>{isRegistering ? 'Yeni hesap oluştur' : 'Hesabına giriş yap'}</p><input type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} /><input type="password" placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} />{message && <p className="auth-message">{message}</p>}<button onClick={isRegistering ? register : login}>{isRegistering ? 'Kayıt Ol' : 'Giriş Yap'}</button><button className="switch-auth" onClick={() => { setIsRegistering(!isRegistering); setMessage('') }}>{isRegistering ? 'Zaten hesabın var mı? Giriş yap' : 'Hesabın yok mu? Kayıt ol'}</button></div></div>
+  if (!isLoggedIn) return <div className="login-container"><div className="login-card"><h1>TaskFlow</h1><p>{isRegistering ? 'Yeni hesap oluştur' : 'Hesabına giriş yap'}</p><input type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} /><input type="password" placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} />{message && <p className={`auth-message ${message.startsWith('Kayıt başarılı') ? 'success' : ''}`}>{message}</p>}<button onClick={isRegistering ? register : login}>{isRegistering ? 'Kayıt Ol' : 'Giriş Yap'}</button><button className="switch-auth" onClick={() => { setIsRegistering(!isRegistering); setMessage('') }}>{isRegistering ? 'Zaten hesabın var mı? Giriş yap' : 'Hesabın yok mu? Kayıt ol'}</button></div></div>
   const sorting = <select value={sort} onChange={(e) => { setSort(e.target.value); setPage(1) }}><option value="due_date">Tarih (en yakın)</option><option value="due_date_desc">Tarih (en uzak)</option><option value="title">Başlık (A-Z)</option><option value="title_desc">Başlık (Z-A)</option><option value="priority">Öncelik (yüksek)</option><option value="priority_desc">Öncelik (düşük)</option><option value="status">Durum</option></select>
   return (
     <div className="app-shell">
@@ -164,7 +195,7 @@ function App() {
           <span className="profile-name">{accountEmail || 'TaskFlow kullanıcısı'}</span>
         </header>
         <main className="dashboard-content">
-          {view === 'reminders' ? (<section className="settings-panel reminders-page"><div className="reminder-list"><p className="eyebrow">HATIRLATICILAR</p><h2>Planlanan bildirimler</h2><p className="reminder-intro">Yaklaşan görevlerin için oluşturduğun e-posta bildirimleri burada görünür.</p>{reminders.length === 0 ? <p className="empty-reminders">Henüz hatırlatıcı yok. Görevlerim sayfasından yeni bir bildirim oluşturabilirsin.</p> : reminders.map((reminder) => <div className="reminder-item" key={reminder.id}><strong>{reminder.taskTitle}</strong><span>{reminder.daysBefore} gün kala e-posta gönderilecek</span><small>{reminder.recipientEmail}</small></div>)}</div></section>) : view === 'settings' ? (
+          {view === 'reminders' ? (<section className="settings-panel reminders-page"><div className="reminder-list"><p className="eyebrow">HATIRLATICILAR</p><h2>Planlanan bildirimler</h2><p className="reminder-intro">Yaklaşan görevlerin için oluşturduğun e-posta bildirimleri burada görünür.</p>{reminders.length === 0 ? <p className="empty-reminders">Henüz hatırlatıcı yok. Görevlerim sayfasından yeni bir bildirim oluşturabilirsin.</p> : reminders.map((reminder) => <div className="reminder-item" key={reminder.id}><strong>{reminder.taskTitle}</strong><span>{reminder.isSent ? 'Gönderildi' : `Bekliyor · ${reminder.daysBefore} gün kala gönderilecek`}</span><small>{reminder.recipientEmail}</small></div>)}</div></section>) : view === 'settings' ? (
             <section className="settings-panel">
               <p className="eyebrow">TERCİHLER</p><h2>Görünüm ayarları</h2><p>Bu seçenekler görev listesinin görünümünü düzenler.</p>
               <label>Sayfa başına görev</label>
