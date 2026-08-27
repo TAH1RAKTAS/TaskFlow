@@ -1,6 +1,7 @@
 ﻿services:
   taskflow:
     image: taskflow
+    restart: unless-stopped
     build:
       context: .
       dockerfile: TaskFlow/Dockerfile
@@ -19,6 +20,8 @@
 
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    restart: unless-stopped
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
