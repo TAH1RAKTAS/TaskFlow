@@ -14,7 +14,7 @@ LoadLocalDevelopmentEnvironment(builder);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection yapılandırması bulunamadı.");
-var databaseProvider = builder.Configuration["Database:Provider"] ?? "SqlServer";
+var databaseProvider = ResolveDatabaseProvider(builder, connectionString);
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key yapılandırması bulunamadı.");
 Log.Logger = new LoggerConfiguration()
@@ -184,4 +184,21 @@ static void LoadLocalDevelopmentEnvironment(WebApplicationBuilder builder)
         builder.Configuration["Gmail:Address"] = gmailAddress;
     if (values.TryGetValue("GMAIL_APP_PASSWORD", out var gmailPassword))
         builder.Configuration["Gmail:AppPassword"] = gmailPassword;
+}
+
+static string ResolveDatabaseProvider(WebApplicationBuilder builder, string connectionString)
+{
+    var configuredProvider = builder.Configuration["Database:Provider"] ?? "SqlServer";
+    var hasSqlServerConnection = connectionString.Contains("Server=", StringComparison.OrdinalIgnoreCase);
+
+    if (!configuredProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase) ||
+        !hasSqlServerConnection)
+        return configuredProvider;
+
+    // Eski User Secrets ayarlarında SQL Server bağlantısı bulunup provider eksik olabilir.
+    // Bu durumda Development'taki SQLite varsayılanıyla çakışmayı otomatik düzeltir.
+    builder.Configuration["Database:Provider"] = "SqlServer";
+    builder.Configuration["Database:EnsureCreated"] = "false";
+    builder.Configuration["Database:ApplyMigrations"] = "true";
+    return "SqlServer";
 }

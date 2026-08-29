@@ -70,6 +70,13 @@ ekranından hesabınızı oluşturup ardından giriş yapın.
 > Proje kökünde geçerli bir `.env` varsa uygulama mevcut SQL Server geliştirme
 > veritabanını kullanır; böylece daha önce oluşturulmuş kullanıcı ve görevler korunur.
 
+Eski bir kurulumdan SQL Server bağlantısı User Secrets içinde kalmışsa uygulama
+provider'ı otomatik algılar. Tamamen temiz SQLite başlangıcına dönmek için:
+
+```bash
+dotnet user-secrets clear
+```
+
 ## Docker ile SQL Server
 
 Gereksinimler: Docker Desktop ve Node.js.
