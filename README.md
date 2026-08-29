@@ -20,7 +20,7 @@ TaskFlow; görevlerinizi planlamanızı, önceliklendirmenizi, filtrelemenizi ve
 | Katman | Teknolojiler |
 | --- | --- |
 | Backend | ASP.NET Core 10, C#, Entity Framework Core |
-| Veritabanı | Microsoft SQL Server |
+| Veritabanı | SQLite (hızlı başlangıç), Microsoft SQL Server (Docker/kalıcı geliştirme) |
 | Kimlik doğrulama | JWT Bearer, BCrypt |
 | Frontend | React 19, TypeScript, Vite |
 | Test | xUnit, Moq, EF Core InMemory |
@@ -37,7 +37,40 @@ TaskFlow/
 └── .env.example          # Docker yapılandırma şablonu
 ```
 
-## Hızlı başlangıç — Docker
+## En hızlı başlangıç — `dotnet run`
+
+Gereksinimler: [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) ve frontend için Node.js.
+
+Projeyi klonlayıp backend klasörüne girin:
+
+```bash
+git clone https://github.com/TAH1RAKTAS/TaskFlow.git
+cd TaskFlow/TaskFlow
+dotnet run
+```
+
+İlk çalıştırmada paketler ve yerel SQLite veritabanı otomatik hazırlanır. Başka bir
+veritabanı, parola, `.env` veya Docker kurulumu gerekmez. Backend çalıştığında:
+
+- API durum sayfası: `http://localhost:5070`
+- OpenAPI belgesi: `http://localhost:5070/openapi/v1.json`
+
+Frontend'i ikinci bir terminalde başlatın:
+
+```bash
+cd TaskFlow/taskflow-client
+npm install
+npm run dev
+```
+
+Tarayıcıdan `http://localhost:5173` adresine gidin. İlk kullanımda **Kayıt Ol**
+ekranından hesabınızı oluşturup ardından giriş yapın.
+
+> Yerel SQLite veritabanı `taskflow.development.db` adıyla oluşur ve Git'e eklenmez.
+> Proje kökünde geçerli bir `.env` varsa uygulama mevcut SQL Server geliştirme
+> veritabanını kullanır; böylece daha önce oluşturulmuş kullanıcı ve görevler korunur.
+
+## Docker ile SQL Server
 
 Gereksinimler: Docker Desktop ve Node.js.
 
@@ -69,15 +102,19 @@ Web uygulaması varsayılan olarak `http://localhost:5173`, API ise `http://loca
 - Apple Silicon Mac'lerde SQL Server amd64 emülasyonu ile çalışır. Compose dosyası gerekli platformu açıkça seçer ve beklenmeyen bir container kapanmasında servisleri otomatik yeniden başlatır.
 - Container durumlarını `docker compose ps`, son hata kayıtlarını `docker compose logs --tail=50` ile kontrol edebilirsiniz.
 
-## Yerel geliştirme
+## SQL Server ile yerel geliştirme
 
-Gereksinimler: .NET 10 SDK, Node.js ve çalışan bir SQL Server.
+Bu bölüm yalnızca SQLite yerine SQL Server kullanmak isteyen geliştiriciler içindir.
+Hızlı başlangıç için yukarıdaki `dotnet run` adımları yeterlidir.
 
 Gizli değerleri repoya yazmak yerine .NET User Secrets kullanın:
 
 ```bash
 dotnet user-secrets set --project TaskFlow "ConnectionStrings:DefaultConnection" "Server=localhost,1433;Database=TaskFlowDb;User Id=sa;Password=YOUR_PASSWORD;TrustServerCertificate=True"
 dotnet user-secrets set --project TaskFlow "Jwt:Key" "YOUR_RANDOM_SECRET_WITH_AT_LEAST_32_CHARACTERS"
+dotnet user-secrets set --project TaskFlow "Database:Provider" "SqlServer"
+dotnet user-secrets set --project TaskFlow "Database:EnsureCreated" "false"
+dotnet user-secrets set --project TaskFlow "Database:ApplyMigrations" "true"
 ```
 
 İsteğe bağlı e-posta hatırlatıcıları için:

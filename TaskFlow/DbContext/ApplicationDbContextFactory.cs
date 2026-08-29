@@ -22,11 +22,14 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:DefaultConnection yapılandırması bulunamadı.");
+        var databaseProvider = configuration["Database:Provider"] ?? "SqlServer";
 
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseSqlServer(connectionString)
-            .Options;
+        var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
+        if (databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+            optionsBuilder.UseSqlite(connectionString);
+        else
+            optionsBuilder.UseSqlServer(connectionString);
 
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(optionsBuilder.Options);
     }
 }

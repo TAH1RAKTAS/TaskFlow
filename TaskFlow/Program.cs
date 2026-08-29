@@ -9,9 +9,12 @@ using TaskFlow.Services;
 using Serilog;
 var builder = WebApplication.CreateBuilder(args);
 // ASP.NET Core uygulamasını oluşturur .
+LoadLocalDevelopmentEnvironment(builder);
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection yapılandırması bulunamadı.");
+var databaseProvider = builder.Configuration["Database:Provider"] ?? "SqlServer";
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key yapılandırması bulunamadı.");
 Log.Logger = new LoggerConfiguration()
@@ -63,8 +66,16 @@ builder.Services.AddProblemDetails();
 builder.Services.AddScoped<ITaskService, TaskService>();
 // ITaskService istendiğinde TaskService'i verir.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
-// EF Core'u SQL Server ile yapılandırır.
+{
+    if (databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlite(connectionString);
+        return;
+    }
+
+    options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure());
+});
+// Yeni klonlarda SQLite, .env/Docker yapılandırmasında SQL Server kullanır.
 builder.Services.AddOpenApi();
 // OpenAPI desteğini ekler.
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -72,11 +83,15 @@ builder.Services.AddHostedService<ReminderWorker>();
 // IAuthService istendiğinde AuthService'i verir.
 var app = builder.Build();
 // Uygulamanın çalışma pipeline'ını oluşturur.
-if (builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
+if (builder.Configuration.GetValue<bool>("Database:EnsureCreated") ||
+    builder.Configuration.GetValue<bool>("Database:ApplyMigrations"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    db.Database.Migrate();
+    if (builder.Configuration.GetValue<bool>("Database:EnsureCreated"))
+        db.Database.EnsureCreated();
+    else
+        db.Database.Migrate();
 }
 app.UseExceptionHandler(exceptionApp =>
 {
@@ -126,5 +141,47 @@ if (app.Environment.IsDevelopment())
 }
 app.MapControllers();
 // Controller endpoint'lerini aktif eder.
+app.MapGet("/", () => Results.Ok(new
+{
+    service = "TaskFlow API",
+    status = "running"
+}));
 app.Run();
 // Uygulamayı çalıştırır.
+
+static void LoadLocalDevelopmentEnvironment(WebApplicationBuilder builder)
+{
+    if (!builder.Environment.IsDevelopment() ||
+        Environment.GetEnvironmentVariable("Database__Provider") is not null ||
+        !string.Equals(builder.Configuration["Database:Provider"], "Sqlite",
+            StringComparison.OrdinalIgnoreCase))
+        return;
+
+    var envPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".env"));
+    if (!File.Exists(envPath))
+        return;
+
+    var values = File.ReadLines(envPath)
+        .Select(line => line.Trim())
+        .Where(line => line.Length > 0 && !line.StartsWith('#') && line.Contains('='))
+        .Select(line => line.Split('=', 2))
+        .ToDictionary(parts => parts[0].Trim(), parts => parts[1].Trim().Trim('"', '\''));
+
+    if (!values.TryGetValue("MSSQL_SA_PASSWORD", out var password) ||
+        string.IsNullOrWhiteSpace(password) ||
+        !values.TryGetValue("JWT_KEY", out var configuredJwtKey) ||
+        string.IsNullOrWhiteSpace(configuredJwtKey))
+        return;
+
+    builder.Configuration["ConnectionStrings:DefaultConnection"] =
+        $"Server=localhost,1433;Database=TaskFlowDb;User Id=sa;Password={password};TrustServerCertificate=True";
+    builder.Configuration["Jwt:Key"] = configuredJwtKey;
+    builder.Configuration["Database:Provider"] = "SqlServer";
+    builder.Configuration["Database:EnsureCreated"] = "false";
+    builder.Configuration["Database:ApplyMigrations"] = "true";
+
+    if (values.TryGetValue("GMAIL_ADDRESS", out var gmailAddress))
+        builder.Configuration["Gmail:Address"] = gmailAddress;
+    if (values.TryGetValue("GMAIL_APP_PASSWORD", out var gmailPassword))
+        builder.Configuration["Gmail:AppPassword"] = gmailPassword;
+}
